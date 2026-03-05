@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Agentura - Prehled dotaci</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #242836;
+  --border: #2e3345;
+  --text: #e4e6ef;
+  --text2: #8b8fa3;
+  --accent: #6c5ce7;
+  --accent2: #a29bfe;
+  --green: #00b894;
+  --yellow: #fdcb6e;
+  --orange: #e17055;
+  --red: #d63031;
+  --blue: #0984e3;
+  --radius: 10px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+.header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 20px; position: sticky; top: 0; z-index: 100; }
+.header h1 { font-size: 20px; font-weight: 700; white-space: nowrap; }
+.header h1 span { color: var(--accent2); }
+.search-box { flex: 1; max-width: 500px; position: relative; }
+.search-box input { width: 100%; padding: 10px 16px 10px 40px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; outline: none; transition: border-color .2s; }
+.search-box input:focus { border-color: var(--accent); }
+.search-box::before { content: '\1F50D'; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; }
+.stats { display: flex; gap: 16px; margin-left: auto; }
+.stat { text-align: center; }
+.stat-num { font-size: 22px; font-weight: 700; color: var(--accent2); }
+.stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; }
+
+.tabs { display: flex; gap: 4px; padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.tab { padding: 8px 20px; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text2); border: none; background: none; transition: all .2s; }
+.tab:hover { color: var(--text); background: var(--surface2); }
+.tab.active { color: #fff; background: var(--accent); }
+.tab .badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px; font-size: 11px; background: var(--surface2); }
+.tab.active .badge { background: rgba(255,255,255,.2); }
+
+.filters { display: flex; gap: 8px; padding: 12px 24px; align-items: center; flex-wrap: wrap; }
+.filter-btn { padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 13px; color: var(--text2); border: 1px solid var(--border); background: none; transition: all .2s; }
+.filter-btn:hover { border-color: var(--accent); color: var(--text); }
+.filter-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.sort-select { padding: 6px 12px; border-radius: 20px; font-size: 13px; color: var(--text2); border: 1px solid var(--border); background: var(--surface); cursor: pointer; margin-left: auto; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; padding: 20px 24px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; cursor: pointer; transition: all .2s; position: relative; overflow: hidden; }
+.card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+.card-status { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.card-status.active { background: var(--green); }
+.card-status.completed { background: var(--text2); }
+.card-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.card-tag { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--surface2); color: var(--text2); }
+.card-tag.status-active { background: rgba(0,184,148,.15); color: var(--green); }
+.card-tag.status-completed { background: rgba(139,143,163,.15); color: var(--text2); }
+.card-tag.days-critical { background: rgba(214,48,49,.15); color: var(--red); }
+.card-tag.days-warning { background: rgba(225,112,85,.15); color: var(--orange); }
+.card-tag.days-soon { background: rgba(253,203,110,.15); color: var(--yellow); }
+.card-tag.days-ok { background: rgba(0,184,148,.15); color: var(--green); }
+.card-excerpt { font-size: 13px; color: var(--text2); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card-footer { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+.card-date { font-size: 12px; color: var(--text2); }
+
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; justify-content: center; align-items: start; padding: 40px 20px; overflow-y: auto; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; max-width: 800px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; }
+.modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: start; gap: 16px; position: sticky; top: 0; background: var(--surface); border-radius: 14px 14px 0 0; z-index: 1; }
+.modal-header h2 { font-size: 18px; font-weight: 600; line-height: 1.4; }
+.modal-close { width: 32px; height: 32px; border-radius: 8px; border: none; background: var(--surface2); color: var(--text); cursor: pointer; font-size: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.modal-close:hover { background: var(--border); }
+.modal-body { padding: 20px 24px; }
+.modal-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.modal-content { font-size: 14px; line-height: 1.7; color: var(--text2); white-space: pre-wrap; word-break: break-word; max-height: 400px; overflow-y: auto; padding: 16px; background: var(--surface2); border-radius: var(--radius); }
+.modal-link { display: inline-block; margin-top: 16px; padding: 10px 20px; background: var(--accent); color: #fff; text-decoration: none; border-radius: var(--radius); font-size: 14px; font-weight: 500; }
+.modal-link:hover { background: var(--accent2); }
+
+.empty { text-align: center; padding: 60px 20px; color: var(--text2); }
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-text { font-size: 16px; }
+.loading { text-align: center; padding: 60px; color: var(--text2); }
+.updated { font-size: 12px; color: var(--text2); padding: 8px 24px; text-align: right; }
+
+@media (max-width: 768px) {
+  .header { flex-wrap: wrap; }
+  .stats { width: 100%; justify-content: space-around; }
+  .grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>API <span>Agentura</span></h1>
+  <div class="search-box">
+    <input type="text" id="search" placeholder="Hledat v obsahu...">
+  </div>
+  <div class="stats" id="stats"></div>
+</div>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-tab="grants">Dotace <span class="badge" id="badge-grants">0</span></button>
+  <button class="tab" data-tab="articles">Clanky <span class="badge" id="badge-articles">0</span></button>
+  <button class="tab" data-tab="events">Akce <span class="badge" id="badge-events">0</span></button>
+  <button class="tab" data-tab="pages">Stranky <span class="badge" id="badge-pages">0</span></button>
+</div>
+
+<div class="filters" id="filters">
+  <button class="filter-btn active" data-filter="all">Vse</button>
+  <button class="filter-btn" data-filter="active">Probihajici</button>
+  <button class="filter-btn" data-filter="completed">Ukoncene</button>
+  <select class="sort-select" id="sort">
+    <option value="title">Radit: Nazev</option>
+    <option value="date-desc">Radit: Nejnovejsi</option>
+    <option value="date-asc">Radit: Nejstarsi</option>
+  </select>
+</div>
+
+<div class="grid" id="grid">
+  <div class="loading">Nacitam data...</div>
+</div>
+
+<div class="updated" id="updated"></div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title"></h2>
+      <button class="modal-close" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-meta" id="modal-meta"></div>
+      <div class="modal-content" id="modal-content"></div>
+      <a class="modal-link" id="modal-link" href="#" target="_blank">Otevrit na webu</a>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+const state = {
+  tab: 'grants',
+  filter: 'all',
+  sort: 'title',
+  search: '',
+  data: { grants: [], articles: [], events: [], pages: [] }
+};
+
+function getDaysRemaining(endDate) {
+  if (!endDate) return null;
+  try {
+    const end = new Date(endDate);
+    const now = new Date();
+    return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  } catch { return null; }
+}
+
+function init() {
+  state.data = DATA;
+
+  // Auto-reclassify expired grants as completed
+  state.data.grants.forEach(g => {
+    if (g._status === 'active') {
+      const days = getDaysRemaining(g.end_date);
+      if (g.is_expired || (days !== null && days < 0)) {
+        g._status = 'completed';
+      }
+    }
+  });
+
+  document.getElementById('updated').textContent = 'Data aktualizovana: 5. 3. 2026';
+  updateBadges();
+  render();
+}
+
+function updateBadges() {
+  document.getElementById('badge-grants').textContent = state.data.grants.length;
+  document.getElementById('badge-articles').textContent = state.data.articles.length;
+  document.getElementById('badge-events').textContent = state.data.events.length;
+  document.getElementById('badge-pages').textContent = state.data.pages.length;
+
+  const active = state.data.grants.filter(g => g._status === 'active').length;
+  const completed = state.data.grants.filter(g => g._status === 'completed').length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-num">${active}</div><div class="stat-label">Probihajici</div></div>
+    <div class="stat"><div class="stat-num">${completed}</div><div class="stat-label">Ukoncene</div></div>
+    <div class="stat"><div class="stat-num">${state.data.articles.length}</div><div class="stat-label">Clanky</div></div>
+    <div class="stat"><div class="stat-num">${state.data.events.length}</div><div class="stat-label">Akce</div></div>
+  `;
+}
+
+function getDaysClass(days) {
+  if (days === null) return '';
+  if (days <= 3) return 'days-critical';
+  if (days <= 7) return 'days-warning';
+  if (days <= 14) return 'days-soon';
+  return 'days-ok';
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
+  } catch { return ''; }
+}
+
+function truncate(text, len) {
+  if (!text) return '';
+  text = text.replace(/^[\s\S]*?(Dotace|Aktuality|Obsah|Hlavni)/, '').trim();
+  if (text.length <= len) return text;
+  return text.substring(0, len) + '...';
+}
+
+function getItems() {
+  let items = state.data[state.tab] || [];
+  if (state.tab === 'grants' && state.filter !== 'all') {
+    items = items.filter(i => i._status === state.filter);
+  }
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    items = items.filter(i =>
+      (i.title || '').toLowerCase().includes(q) ||
+      (i.content || '').toLowerCase().includes(q) ||
+      (i.description || '').toLowerCase().includes(q)
+    );
+  }
+  items = [...items];
+  if (state.sort === 'title') {
+    items.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'cs'));
+  } else if (state.sort === 'date-desc') {
+    items.sort((a, b) => new Date(b.scraped_at || 0) - new Date(a.scraped_at || 0));
+  } else if (state.sort === 'date-asc') {
+    items.sort((a, b) => new Date(a.scraped_at || 0) - new Date(b.scraped_at || 0));
+  }
+  return items;
+}
+
+function renderCard(item, index) {
+  const isGrant = state.tab === 'grants';
+  const days = isGrant ? getDaysRemaining(item.end_date) : null;
+  const daysClass = getDaysClass(days);
+  const statusClass = item._status === 'active' ? 'status-active' : 'status-completed';
+
+  let tags = '';
+  if (isGrant) {
+    const statusLabel = item._status === 'active' ? 'Probihajici' : 'Ukoncena';
+    tags += `<span class="card-tag ${statusClass}">${statusLabel}</span>`;
+    if (days !== null && item._status === 'active') {
+      tags += `<span class="card-tag ${daysClass}">${days > 0 ? days + ' dni' : 'Vyprsela'}</span>`;
+    }
+    if (item.end_date) {
+      tags += `<span class="card-tag">Do: ${formatDate(item.end_date)}</span>`;
+    }
+  }
+  if (state.tab === 'events' && item.event_type) {
+    tags += `<span class="card-tag">${item.event_type}</span>`;
+  }
+  if (state.tab === 'events' && item.event_date) {
+    tags += `<span class="card-tag">Datum: ${formatDate(item.event_date)}</span>`;
+  }
+
+  const excerpt = truncate(item.content || item.description || '', 200);
+  const date = formatDate(item.scraped_at);
+
+  return `<div class="card" onclick="openModal(${index})">
+    ${isGrant ? `<div class="card-status ${item._status}"></div>` : ''}
+    <div class="card-title">${item.title || 'Bez nazvu'}</div>
+    <div class="card-meta">${tags}</div>
+    <div class="card-excerpt">${excerpt}</div>
+    <div class="card-footer">
+      <span class="card-date">${date}</span>
+    </div>
+  </div>`;
+}
+
+function render() {
+  const items = getItems();
+  const grid = document.getElementById('grid');
+  document.getElementById('filters').style.display = state.tab === 'grants' ? 'flex' : 'none';
+
+  if (items.length === 0) {
+    grid.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Zadne polozky</div></div>`;
+    return;
+  }
+  grid.innerHTML = items.map((item, i) => renderCard(item, i)).join('');
+}
+
+let currentItems = [];
+function openModal(index) {
+  currentItems = getItems();
+  const item = currentItems[index];
+  if (!item) return;
+
+  document.getElementById('modal-title').textContent = item.title || 'Bez nazvu';
+
+  let meta = '';
+  if (item._status) {
+    const statusLabel = item._status === 'active' ? 'Probihajici' : 'Ukoncena';
+    const statusClass = item._status === 'active' ? 'status-active' : 'status-completed';
+    meta += `<span class="card-tag ${statusClass}">${statusLabel}</span>`;
+  }
+  if (item.end_date) meta += `<span class="card-tag">Ukonceni: ${formatDate(item.end_date)}</span>`;
+  if (item.event_type) meta += `<span class="card-tag">${item.event_type}</span>`;
+  if (item.event_date) meta += `<span class="card-tag">Datum: ${formatDate(item.event_date)}</span>`;
+  if (item.location) meta += `<span class="card-tag">Misto: ${item.location}</span>`;
+  if (item.scraped_at) meta += `<span class="card-tag">Stazeno: ${formatDate(item.scraped_at)}</span>`;
+  document.getElementById('modal-meta').innerHTML = meta;
+
+  let content = item.content || item.description || 'Bez obsahu';
+  content = content.replace(/^[\s\S]*?(?=\n[A-Z\u00C0-\u017E])/m, '').trim() || content;
+  document.getElementById('modal-content').textContent = content;
+
+  const link = document.getElementById('modal-link');
+  if (item.url) { link.href = item.url; link.style.display = 'inline-block'; }
+  else { link.style.display = 'none'; }
+
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  state.tab = tab.dataset.tab;
+  render();
+});
+
+document.getElementById('filters').addEventListener('click', (e) => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.filter = btn.dataset.filter;
+  render();
+});
+
+document.getElementById('sort').addEventListener('change', (e) => { state.sort = e.target.value; render(); });
+
+let searchTimeout;
+document.getElementById('search').addEventListener('input', (e) => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => { state.search = e.target.value; render(); }, 200);
+});
+
+init();
+</script>
+</body>
+</html>
