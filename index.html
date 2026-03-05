@@ -114,13 +114,28 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sa
 .cal-day.past { color: var(--text2); opacity: .5; }
 .cal-day.today { border-color: var(--accent); background: rgba(108,92,231,.15); font-weight: 700; }
 .cal-day.future { color: var(--green); }
-.cal-day.has-grants { cursor: pointer; border-color: var(--border); }
-.cal-day.has-grants:hover { border-color: var(--accent); transform: scale(1.05); }
-.cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); margin-top: 2px; }
+.cal-day.has-items { cursor: pointer; border-color: var(--border); }
+.cal-day.has-items:hover { border-color: var(--accent); transform: scale(1.05); }
+.cal-dots { display: flex; gap: 3px; margin-top: 2px; }
+.cal-dot { width: 6px; height: 6px; border-radius: 50%; }
+.cal-dot.dot-grant { background: var(--accent2); }
+.cal-dot.dot-article { background: var(--blue); }
+.cal-dot.dot-event { background: var(--green); }
 .cal-badge { position: absolute; top: 2px; right: 4px; font-size: 10px; background: var(--accent); color: #fff; border-radius: 8px; padding: 0 5px; line-height: 16px; }
 .cal-day-list { margin-top: 16px; }
 .cal-day-list h4 { font-size: 15px; margin-bottom: 12px; color: var(--text2); }
 .cal-day-list .card { margin-bottom: 8px; }
+.cal-type-tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 600; }
+.cal-type-tag.type-grant { background: rgba(108,92,231,.15); color: var(--accent2); }
+.cal-type-tag.type-article { background: rgba(9,132,227,.15); color: var(--blue); }
+.cal-type-tag.type-event { background: rgba(0,184,148,.15); color: var(--green); }
+.cal-legend { display: flex; gap: 16px; margin-bottom: 12px; font-size: 13px; color: var(--text2); }
+.cal-legend-item { display: flex; align-items: center; gap: 5px; }
+.cal-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+.cal-filter-btns { display: flex; gap: 6px; margin-left: auto; }
+.cal-filter-btn { padding: 4px 12px; border-radius: 16px; cursor: pointer; font-size: 12px; border: 1px solid var(--border); background: none; color: var(--text2); transition: all .2s; }
+.cal-filter-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.cal-filter-btn:hover { border-color: var(--accent); }
 
 @media (max-width: 768px) {
   .header { flex-wrap: wrap; }
@@ -189,7 +204,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sa
     <button id="cal-prev">&larr; Predchozi</button>
     <h3 id="cal-title"></h3>
     <button id="cal-next">Dalsi &rarr;</button>
-    <button id="cal-today" style="margin-left: auto;">Dnes</button>
+    <button id="cal-today">Dnes</button>
+    <div class="cal-filter-btns">
+      <button class="cal-filter-btn active" data-caltype="all">Vse</button>
+      <button class="cal-filter-btn" data-caltype="grant">Dotace</button>
+      <button class="cal-filter-btn" data-caltype="article">Clanky</button>
+      <button class="cal-filter-btn" data-caltype="event">Akce</button>
+    </div>
+  </div>
+  <div class="cal-legend">
+    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:var(--accent2)"></div> Dotace</div>
+    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:var(--blue)"></div> Clanky</div>
+    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:var(--green)"></div> Akce</div>
   </div>
   <div class="cal-grid" id="cal-grid"></div>
   <div class="cal-day-list" id="cal-day-list"></div>
@@ -225,6 +251,7 @@ const state = {
   calMonth: new Date().getMonth(),
   calYear: new Date().getFullYear(),
   calSelectedDay: null,
+  calTypeFilter: 'all',
   data: { grants: [], articles: [], events: [], pages: [] }
 };
 
@@ -447,16 +474,31 @@ function render() {
 // --- Calendar ---
 const MONTH_NAMES = ['Leden','Unor','Brezen','Duben','Kveten','Cerven','Cervenec','Srpen','Zari','Rijen','Listopad','Prosinec'];
 const DAY_NAMES = ['Po','Ut','St','Ct','Pa','So','Ne'];
+const TYPE_LABELS = { grant: 'Dotace', article: 'Clanek', event: 'Akce' };
+const TYPE_CSS = { grant: 'type-grant', article: 'type-article', event: 'type-event' };
+const DOT_CSS = { grant: 'dot-grant', article: 'dot-article', event: 'dot-event' };
 
-function getGrantsByEndDate() {
+// Store all calendar items for click lookup
+let calItemsStore = [];
+
+function getCalendarItemsByDate() {
   const map = {};
-  state.data.grants.forEach(g => {
-    if (!g.end_date) return;
-    const d = new Date(g.end_date);
+  const typeFilter = state.calTypeFilter;
+
+  function addItem(item, dateStr, type) {
+    if (typeFilter !== 'all' && type !== typeFilter) return;
+    if (!dateStr) return;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return;
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     if (!map[key]) map[key] = [];
-    map[key].push(g);
-  });
+    map[key].push({ ...item, _cal_type: type });
+  }
+
+  state.data.grants.forEach(g => addItem(g, g.end_date, 'grant'));
+  state.data.articles.forEach(a => addItem(a, a._cal_date || a.scraped_at, 'article'));
+  state.data.events.forEach(e => addItem(e, e._cal_date || e.scraped_at, 'event'));
+
   return map;
 }
 
@@ -468,12 +510,9 @@ function renderCalendar() {
 
   document.getElementById('cal-title').textContent = `${MONTH_NAMES[month]} ${year}`;
 
-  const grantsByDate = getGrantsByEndDate();
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const daysInMonth = lastDay.getDate();
-  // Monday = 0
-  let startDay = firstDay.getDay() - 1;
+  const itemsByDate = getCalendarItemsByDate();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  let startDay = new Date(year, month, 1).getDay() - 1;
   if (startDay < 0) startDay = 6;
 
   let html = DAY_NAMES.map(d => `<div class="cal-header">${d}</div>`).join('');
@@ -484,8 +523,8 @@ function renderCalendar() {
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dateKey = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const grants = grantsByDate[dateKey] || [];
-    const hasGrants = grants.length > 0;
+    const items = itemsByDate[dateKey] || [];
+    const hasItems = items.length > 0;
     const isToday = dateKey === todayStr;
     const dateObj = new Date(year, month, day);
     const isPast = dateObj < new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -494,32 +533,48 @@ function renderCalendar() {
     if (isToday) cls += ' today';
     else if (isPast) cls += ' past';
     else cls += ' future';
-    if (hasGrants) cls += ' has-grants';
+    if (hasItems) cls += ' has-items';
 
-    html += `<div class="${cls}" ${hasGrants ? `onclick="selectCalDay('${dateKey}')"` : ''}>
+    // Build colored dots for types present
+    const typesPresent = [...new Set(items.map(i => i._cal_type))];
+    const dots = typesPresent.map(t => `<div class="cal-dot ${DOT_CSS[t]}"></div>`).join('');
+
+    html += `<div class="${cls}" ${hasItems ? `onclick="selectCalDay('${dateKey}')"` : ''}>
       ${day}
-      ${hasGrants ? `<div class="cal-dot"></div>${grants.length > 1 ? `<span class="cal-badge">${grants.length}</span>` : ''}` : ''}
+      ${hasItems ? `<div class="cal-dots">${dots}</div>${items.length > 1 ? `<span class="cal-badge">${items.length}</span>` : ''}` : ''}
     </div>`;
   }
 
   document.getElementById('cal-grid').innerHTML = html;
 
-  // Render selected day grants
+  // Render selected day items
   if (state.calSelectedDay) {
-    const grants = grantsByDate[state.calSelectedDay] || [];
-    if (grants.length > 0) {
+    const items = itemsByDate[state.calSelectedDay] || [];
+    calItemsStore = items;
+    if (items.length > 0) {
       const parts = state.calSelectedDay.split('-');
       const dayLabel = `${parseInt(parts[2])}. ${parseInt(parts[1])}. ${parts[0]}`;
-      let listHtml = `<h4>Dotace koncici ${dayLabel} (${grants.length})</h4>`;
-      grants.forEach(g => {
-        const statusClass = g._status === 'active' ? 'status-active' : 'status-completed';
-        const statusLabel = g._status === 'active' ? 'Probihajici' : 'Ukoncena';
-        listHtml += `<div class="card" onclick="openModalDirect(${JSON.stringify(g.title).replace(/"/g, '&quot;')})">
-          <div class="card-status ${g._status}"></div>
-          <div class="card-title">${g.title || 'Bez nazvu'}</div>
+      let listHtml = `<h4>Udalosti ${dayLabel} (${items.length})</h4>`;
+      items.forEach((item, idx) => {
+        const type = item._cal_type;
+        const typeLabel = TYPE_LABELS[type] || type;
+        const typeCss = TYPE_CSS[type] || '';
+
+        let statusHtml = '';
+        if (type === 'grant') {
+          const sc = item._status === 'active' ? 'status-active' : 'status-completed';
+          const sl = item._status === 'active' ? 'Probihajici' : 'Ukoncena';
+          statusHtml = `<span class="card-tag ${sc}">${sl}</span>`;
+        }
+
+        listHtml += `<div class="card" onclick="openCalItem(${idx})">
+          ${type === 'grant' ? `<div class="card-status ${item._status || ''}"></div>` : ''}
+          <div class="card-title">${item.title || 'Bez nazvu'}</div>
           <div class="card-meta">
-            <span class="card-tag ${statusClass}">${statusLabel}</span>
-            ${g._program ? `<span class="card-tag program-tag">${g._program}</span>` : ''}
+            <span class="cal-type-tag ${typeCss}">${typeLabel}</span>
+            ${statusHtml}
+            ${item._program ? `<span class="card-tag program-tag">${item._program}</span>` : ''}
+            ${item.event_type ? `<span class="card-tag">${item.event_type}</span>` : ''}
           </div>
         </div>`;
       });
@@ -537,16 +592,21 @@ function selectCalDay(dateKey) {
   renderCalendar();
 }
 
-function openModalDirect(title) {
-  const grant = state.data.grants.find(g => g.title === title);
-  if (!grant) return;
-  showModal(grant);
+function openCalItem(idx) {
+  const item = calItemsStore[idx];
+  if (!item) return;
+  showModal(item);
 }
 
 function showModal(item) {
   document.getElementById('modal-title').textContent = item.title || 'Bez nazvu';
 
   let meta = '';
+  if (item._cal_type && item._cal_type !== 'grant') {
+    const tl = TYPE_LABELS[item._cal_type] || item._cal_type;
+    const tc = TYPE_CSS[item._cal_type] || '';
+    meta += `<span class="cal-type-tag ${tc}">${tl}</span>`;
+  }
   if (item._status) {
     const statusLabel = item._status === 'active' ? 'Probihajici' : 'Ukoncena';
     const statusClass = item._status === 'active' ? 'status-active' : 'status-completed';
@@ -666,6 +726,16 @@ document.getElementById('cal-today').addEventListener('click', () => {
   const now = new Date();
   state.calMonth = now.getMonth();
   state.calYear = now.getFullYear();
+  state.calSelectedDay = null;
+  renderCalendar();
+});
+
+document.querySelector('.cal-filter-btns').addEventListener('click', (e) => {
+  const btn = e.target.closest('.cal-filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('.cal-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.calTypeFilter = btn.dataset.caltype;
   state.calSelectedDay = null;
   renderCalendar();
 });
